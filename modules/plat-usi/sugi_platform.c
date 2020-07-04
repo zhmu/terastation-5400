@@ -51,6 +51,7 @@ static unsigned int it87_gpioset3_base_addr;
 
 /* declare timer function */
 static struct timer_list btn_timer;
+static int btn_timer_pin = -1;
 
 /* button information strcture */
 static struct button_info_st button_info[] = {
@@ -195,11 +196,11 @@ static int it87_gpio_getsts(int pin)
 }
 
 /* ------------- button timer ------------ */	
-static void timer_function(unsigned long data)
+static void timer_function(struct timer_list* __unused)
 {
 	int	pin_sts;
 
-	pin_sts=it87_gpio_getsts(data);
+	pin_sts=it87_gpio_getsts(btn_timer_pin);
 	
 	if(pin_sts){
 	//Clear de-bounce ping SMI status
@@ -256,7 +257,6 @@ static struct file_operations button_status_fops = {
 /* ----------- interrupt handler ---------- */
 static irqreturn_t sugi_interrupt(int irq, void *dev_id)
 {
-	int	pin=0;
 	unsigned char smi_sts;
 	
 	#ifdef CONFIG_BUFFALO_PLATFORM
@@ -284,7 +284,7 @@ static irqreturn_t sugi_interrupt(int irq, void *dev_id)
 			#else
 				printk("EVENT IS OCCURRED\n");
 			#endif
-			pin = BTN_FUNC;
+			btn_timer_pin = BTN_FUNC;
 		}
 		else if(smi_sts == IT87_DEB1){
 			#ifdef CONFIG_BUFFALO_PLATFORM
@@ -292,15 +292,12 @@ static irqreturn_t sugi_interrupt(int irq, void *dev_id)
 			#else
 				printk("EVENT IS OCCURRED\n");
 			#endif
-			pin = BTN_DISP;
+			btn_timer_pin = BTN_DISP;
 		}
 		
 		/* setup timer for checking button GPIO status */
- 		init_timer(&btn_timer);
-		btn_timer.expires = jiffies + TIMER_DELAY;
-		btn_timer.data = pin;
-		btn_timer.function = timer_function;
-		add_timer(&btn_timer);
+		timer_setup(&btn_timer, timer_function, 0);
+		mod_timer(&btn_timer, jiffies + TIMER_DELAY);
 		
 		#ifdef CONFIG_BUFFALO_PLATFORM
 			if(msg[0] != '\0')
@@ -712,7 +709,7 @@ static int open_power_control_status(struct inode *inode, struct file *file)
 }
 
 /* ----- set HDD power control status ---- */
-static int store_power_control_status(struct file *file, const char *buffer, size_t count, loff_t *offset)
+static ssize_t store_power_control_status(struct file *file, const char *buffer, size_t count, loff_t *offset)
 {
 	int tmpgpioval;
 	struct sugi_hdd_info_st *hdd_info = (struct sugi_hdd_info_st *)PDE_DATA(file_inode(file));
@@ -759,7 +756,7 @@ static void SataHotplugPollingUpdatePinstat(void)
 	}
 }
 
-static void SataHotplugPolling(unsigned long data)
+static void SataHotplugPolling(struct timer_list* __unused)
 {
 	unsigned int i = 0;
 	char buf[32];
@@ -791,7 +788,7 @@ static void SataHotplugPolling(unsigned long data)
 			sata_hotplug_data[i].prevplugstat = sata_hotplug_data[i].presentpinstat;
 		}
 	}
-	sata_hotplug_polling_timer.expires += SATA_POL_INTERVAL;
+	sata_hotplug_polling_timer.expires = jiffies + SATA_POL_INTERVAL;
 	add_timer(&sata_hotplug_polling_timer);
 }
 
@@ -804,10 +801,8 @@ static unsigned long SataHotplugPollingStart(void)
 		sata_hotplug_data[i].loops = SATA_POL_LOOPS;
 	}
 
-        init_timer(&sata_hotplug_polling_timer);
-        sata_hotplug_polling_timer.expires = jiffies + SATA_POL_INTERVAL;
-        sata_hotplug_polling_timer.function = SataHotplugPolling;
-        add_timer(&sata_hotplug_polling_timer);
+		timer_setup(&sata_hotplug_polling_timer, SataHotplugPolling, 0);
+		mod_timer(&sata_hotplug_polling_timer, jiffies + SATA_POL_INTERVAL);
 
         return 0;
 }
