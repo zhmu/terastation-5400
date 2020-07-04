@@ -1,1 +1,1 @@
-obj-m := kernevnt.o kernevntProc.o
+obj-m := kernevnt.o

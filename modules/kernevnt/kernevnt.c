@@ -25,21 +25,25 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
 #include <linux/miscdevice.h>
 
 #include <asm/string.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/serial.h>
-//#include "buffalo/kernevnt.h"
-#if defined(CONFIG_ARCH_FEROCEON_KW)
-#include "buffalo/kernevntProc.h"
-#include "mv_network/mv_ethernet/mv_netdev.h"
-#else
-#include "kernevntProc.h"
-#endif
+
+#define MAX_CMDLEN  32
+#define MAX_QUELEN  32
 
 #define bzero(p,sz) memset(p,0,sz)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+#define HAVE_PROC_OPS 1
+#else
+#define HAVE_PROC_OPS 0
+#endif
+
 
 //#define DEBUG
 //#define FUNCMSG
@@ -279,6 +283,60 @@ void kernevnt_EnetOverload(const char *name)
 	buffalo_kernevnt_queuein(msg);
 }
 
+// proc
+
+// event notice from kernel
+static ssize_t BuffaloKernevnt_read_proc(struct file *fp, char *data,
+                                         size_t count, loff_t *off)
+{
+	int len = 0;
+	char retbuff[MAX_CMDLEN+1+2];
+	static int finished = 0;
+	
+	if (finished) {
+		finished = 0;
+		return 0;
+	}	
+	
+	TRACE(printk(">%s count=%d off=%ld\n",__FUNCTION__,count,off));
+	if (count < 0)
+		return -EINVAL;
+	
+	if (*off>0 || wait_event_interruptible(buffalo_kernevnt_WaitQueue, buffalo_kernevnt_queueout(retbuff,&len)>=0 )!=0){
+		return 0;
+	}
+	
+	if (len>count){
+		// buffer too short
+		return -EINVAL;
+	}
+	finished = 1;
+	memcpy(data,retbuff,len);
+	
+	return len;
+}
+
+#if HAVE_PROC_OPS
+static struct proc_ops fops = {
+  .proc_read = BuffaloKernevnt_read_proc
+};
+#else
+static struct file_operations fops = {
+  .read = BuffaloKernevnt_read_proc
+};
+#endif
+
+static struct proc_dir_entry *
+get_proc_buffalo(void)
+{
+	static struct proc_dir_entry *buffalo = NULL;
+
+	if (buffalo == NULL)
+		buffalo = proc_mkdir("buffalo", NULL);
+
+	return buffalo;
+}
+
 //--------------------------------------------------------------
 /*
  * Initialize driver.
@@ -290,6 +348,7 @@ int __init BuffaloMicon_init (void)
 	// Initialize Local valiables
 	bzero(&MiconDevice, sizeof(MiconDevice));
 	init_waitqueue_head(&buffalo_kernevnt_WaitQueue);
+	proc_create("kernevnt",0,get_proc_buffalo(),&fops);
 	initialized=1;
 	return 0;
 }
@@ -298,13 +357,11 @@ int __init BuffaloMicon_init (void)
 void BuffaloMicon_exit(void)
 {
 	printk("Exiting Buffalo Micon driver\n");
+	remove_proc_entry("kernevnt", get_proc_buffalo());
 	initialized=0;
-
 }
 
 EXPORT_SYMBOL(buffalo_kernevnt_queuein);
-EXPORT_SYMBOL(buffalo_kernevnt_queueout);
-EXPORT_SYMBOL(buffalo_kernevnt_WaitQueue);
 
 module_init(BuffaloMicon_init);
 module_exit(BuffaloMicon_exit);
