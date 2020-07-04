@@ -23,6 +23,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 #include "sugi_platform.h"
 
 
@@ -34,6 +35,12 @@
 /* Define for procfs directory and file */
 #if defined(CONFIG_BUFFALO_PLATFORM)
 #include <buffalo/kernevnt.h>
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+#define HAVE_PROC_OPS 1
+#else
+#define HAVE_PROC_OPS 0
 #endif
 
 
@@ -246,6 +253,14 @@ static int open_button_status(struct inode *inode, struct file *file)
 	return single_open(file, show_button_status, PDE_DATA(file_inode(file)));
 }
 
+#if HAVE_PROC_OPS
+static struct proc_ops button_status_fops = {
+    .proc_open		= open_button_status,
+	.proc_read		= seq_read,
+	.proc_lseek	    = seq_lseek,
+	.proc_release	= single_release
+};
+#else
 static struct file_operations button_status_fops = {
 	.owner		= THIS_MODULE,
         .open		= open_button_status,
@@ -253,6 +268,7 @@ static struct file_operations button_status_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release
 };
+#endif
 
 /* ----------- interrupt handler ---------- */
 static irqreturn_t sugi_interrupt(int irq, void *dev_id)
@@ -680,6 +696,14 @@ static int open_hotplug_status(struct inode *inode, struct file *file)
 	return single_open(file, show_hotplug_status, PDE_DATA(file_inode(file)));
 }
 
+#if HAVE_PROC_OPS
+static struct proc_ops hotplug_status_fops = {
+	.proc_open		= open_hotplug_status,
+	.proc_read		= seq_read,
+	.proc_lseek		= seq_lseek,
+	.proc_release	= single_release
+};
+#else
 static struct file_operations hotplug_status_fops = {
 	.owner		= THIS_MODULE,
 	.open		= open_hotplug_status,
@@ -687,6 +711,7 @@ static struct file_operations hotplug_status_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release
 };
+#endif
 
 /* ----- get HDD power control status ---- */
 static int show_power_control_status(struct seq_file *m, void *v)
@@ -735,6 +760,15 @@ static ssize_t store_power_control_status(struct file *file, const char *buffer,
 		return -EINVAL;
 }
 
+#if HAVE_PROC_OPS
+static struct proc_ops power_control_status_fops = {
+    .proc_open		= open_power_control_status,
+    .proc_write		= store_power_control_status,
+	.proc_read		= seq_read,
+	.proc_lseek		= seq_lseek,
+	.proc_release	= single_release
+};
+#else
 static struct file_operations power_control_status_fops = {
 	.owner		= THIS_MODULE,
         .open		= open_power_control_status,
@@ -743,6 +777,7 @@ static struct file_operations power_control_status_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release
 };
+#endif
 
 /* ----------- polling function ---------- */
 
