@@ -30,9 +30,11 @@
  * Description: Global variabls and strctures
  * ---------------------------------------------------------------------------------------------- */
 
+#define CONFIG_BUFFALO_PLATFORM
+
 /* Define for procfs directory and file */
 #if defined(CONFIG_BUFFALO_PLATFORM)
-#include <buffalo/kernevnt.h>
+#include "../kernevnt/kernevnt.h"
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)

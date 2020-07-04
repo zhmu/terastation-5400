@@ -31,7 +31,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/serial.h>
-#include "buffalo/kernevnt.h"
+//#include "buffalo/kernevnt.h"
 #if defined(CONFIG_ARCH_FEROCEON_KW)
 #include "buffalo/kernevntProc.h"
 #include "mv_network/mv_ethernet/mv_netdev.h"

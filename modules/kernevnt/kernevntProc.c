@@ -32,11 +32,17 @@
 #include "buffalo/buffalocore.h"
 #include "buffalo/kernevntProc.h"
 #else
-#include "buffalocore.h"
+//#include "buffalocore.h"
 #include "kernevntProc.h"
 #endif
 
 #define bzero(p,sz) memset(p,0,sz)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+#define HAVE_PROC_OPS 1
+#else
+#define HAVE_PROC_OPS 0
+#endif
 
 //#define DEBUG
 
@@ -84,9 +90,26 @@ static ssize_t BuffaloKernevnt_read_proc(struct file *fp, char *data,
 	return len;
 }
 
+#if HAVE_PROC_OPS
+static struct proc_ops fops = {
+  .proc_read = BuffaloKernevnt_read_proc
+};
+#else
 static struct file_operations fops = {
   .read = BuffaloKernevnt_read_proc
 };
+#endif
+
+static struct proc_dir_entry *
+get_proc_buffalo(void)
+{
+	static struct proc_dir_entry *buffalo = NULL;
+
+	if (buffalo == NULL)
+		buffalo = proc_mkdir("buffalo", NULL);
+
+	return buffalo;
+}
 
 /*
  * Initialize driver.
