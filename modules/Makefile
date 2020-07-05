@@ -23,9 +23,7 @@ clean:
 .PHONY: modules modules_install clean
 
 else
-	# called from kernel build system: just declare what our modules are
-	obj-$(CONFIG_BUFFALO_USI_PLATFORM) += sugi_platform.o
-	
+    # don't support in-kernel builds at this point
 endif
 
 
