@@ -69,6 +69,8 @@ def get_disk_temperatures(devices):
             hdd_temp = hdd_temp.decode('utf-8').strip()
             hdd_temp = int(hdd_temp)
             temperatures.append(hdd_temp)
+        except ValueError as _:
+            pass
         except subprocess.CalledProcessError as _:
             pass
     return temperatures
